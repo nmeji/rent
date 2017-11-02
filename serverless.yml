@@ -1,0 +1,18 @@
+service: rent
+package:
+  artifact: package.zip
+provider:
+  name: google
+  runtime: nodejs
+  project: ${env:PROJECT}
+  credentials: ${env:CREDENTIALS}  # ~/.gcloud/keyfile.json # path must be absolute
+  memorySize: 128
+
+plugins:
+  - serverless-google-cloudfunctions
+
+functions:
+  rent:
+    handler: ${env:ENTRY_POINT}
+    events:
+      - http: rent

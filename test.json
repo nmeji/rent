@@ -1,0 +1,8 @@
+{
+	"url": "http://localhost/api/v1/rent",
+	"method": "POST",
+	"header": {
+		"Content-Type": "application/json"
+	},
+	"body": "{\"monthly_total\":19000,\"monthly_utilities\":3522.41,\"tenants\":[{\"name\":\"MarkIan\",\"days\":19},{\"name\":\"FrancisMark\",\"days\":21},{\"name\":\"Jason\",\"days\":21},{\"name\":\"Jeric\",\"days\":21},{\"name\":\"Niko\",\"days\":28},{\"name\":\"Alden\",\"days\":18}]}"
+}

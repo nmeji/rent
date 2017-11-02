@@ -1,0 +1,25 @@
+version: '3.3'
+services:
+  aws-go-shim:
+    build:
+      context: .
+      dockerfile: Dockerfile.awsgoshim
+    env_file: .env
+    volumes:
+      - .:/go/src/github.com/nmeji/rent
+    working_dir: /go/src/github.com/nmeji/rent
+
+  google-go-shim:
+    image: nmejia/cloud-functions-go-shim:1.0.0
+    env_file: .env
+    volumes:
+      - .:/go/src/github.com/nmeji/rent
+    working_dir: /go/src/github.com/nmeji/rent
+
+  serverless:
+    image: amaysim/serverless:1.23.0
+    env_file: .env
+    volumes:
+      - .:/build
+      - ~/.gcloud/keyfile.json:/opt/gcloud/keyfile.json
+    working_dir: /build

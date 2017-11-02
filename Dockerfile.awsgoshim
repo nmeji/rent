@@ -1,0 +1,20 @@
+FROM eawsy/aws-lambda-go-shim:latest
+
+ENV GOPATH /go
+ENV PATH $GOPATH/bin:$PATH
+ENV GOOS linux
+ENV GOARCH amd64
+
+RUN echo -e '#!/bin/bash -x\n\
+go build -buildmode=plugin -ldflags="-w -s" -o $1.so\n\
+' > /usr/local/bin/build && \
+chmod +x /usr/local/bin/build
+
+RUN echo -e '#!/bin/bash -x\n\
+pack $1 $1.so $2.zip\n' > /usr/local/bin/pkg && \
+chmod +x /usr/local/bin/pkg
+
+RUN true && \
+    yum -q -e 0 -y update || true && \
+    yum -q -e 0 -y install git || true
+RUN go get -u github.com/golang/dep/cmd/dep

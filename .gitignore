@@ -1,2 +1,8 @@
 vendor/
 *.lock
+node_modules/
+package-lock.json
+*.so
+*.zip
+.env
+.serverless/

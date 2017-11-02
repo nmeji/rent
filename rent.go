@@ -4,10 +4,12 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"strconv"
 
 	"github.com/nmeji/rent/math"
+	"go.uber.org/zap"
 )
 
 type Tenant struct {
@@ -16,20 +18,54 @@ type Tenant struct {
 	Rent       float64 `json:"rent"`
 }
 
+type Summary struct {
+	MonthlyTotal     float64  `json:"monthly_total"`
+	MonthlyUtilities float64  `json:"monthly_utilities"`
+	Tenants          []Tenant `json:"tenants"`
+}
+
 var AverageStay func(d, t int) float64 = math.Avg
 
-func SummaryOfContributions(totalRent float64, daysStayed []int) []float64 {
-	totalStay := math.SumInt(daysStayed) // sum of all stays
-	rent := make([]float64, len(daysStayed))
-	for i, ds := range daysStayed {
-		avg := AverageStay(ds, totalStay)
-		rent[i] = math.TruncateFloat(avg*totalRent, 4)
+func daysStayed(t []Tenant) []int {
+	ds := make([]int, len(t))
+	for i, tenant := range t {
+		ds[i] = tenant.DaysStayed
 	}
-	return rent
+	return ds
+}
+
+func Calculate(summary *Summary) {
+	monthly := summary.MonthlyTotal / float64(len(summary.Tenants))
+	utilities := summary.MonthlyUtilities
+	totalStay := math.SumInt(daysStayed(summary.Tenants)) // sum of all stays
+	for i, tenant := range summary.Tenants {
+		avg := AverageStay(tenant.DaysStayed, totalStay)
+		summary.Tenants[i].Rent = math.TruncateFloat(avg*utilities+monthly, 4)
+	}
 }
 
 func printUsage() {
 	fmt.Println("usage: rent monthly_rent total_utilities head_count")
+}
+
+func Rent(w http.ResponseWriter, r *http.Request) {
+	logger, _ := zap.NewDevelopment()
+	defer logger.Sync()
+	defer r.Body.Close()
+	s := new(Summary)
+	err := json.NewDecoder(r.Body).Decode(s)
+	if err != nil {
+		logger.Error("problem decoding JSON", zap.Error(err))
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	Calculate(s)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(w).Encode(s); err != nil {
+		w.WriteHeader(500)
+		return
+	}
 }
 
 func main() {
@@ -38,15 +74,15 @@ func main() {
 		os.Exit(0)
 	}
 
-	monthlyRent := float64(0)
+	var monthlyTotal float64
 	if total, err := strconv.ParseFloat(os.Args[1], 64); err == nil {
-		monthlyRent = total
+		monthlyTotal = total
 	} else {
 		fmt.Println("Please provide the correct monthly rent")
 		os.Exit(1)
 	}
 
-	utilsCost := float64(0)
+	var utilsCost float64
 	if uc, err := strconv.ParseFloat(os.Args[2], 64); err == nil {
 		utilsCost = uc
 	} else {
@@ -63,8 +99,7 @@ func main() {
 	}
 
 	scanner := bufio.NewScanner(os.Stdin)
-	tenant := make([]Tenant, headCount)
-	daysStayed := make([]int, headCount)
+	tenants := make([]Tenant, headCount)
 	for i := 0; i < headCount; i++ {
 		name := fmt.Sprintf("Tenant #%d", i+1)
 		fmt.Printf("[%s] Name: ", name)
@@ -78,16 +113,18 @@ func main() {
 				days = num
 			}
 		}
-		tenant[i] = Tenant{Name: name, DaysStayed: days}
-		daysStayed[i] = days
+		tenants[i] = Tenant{Name: name, DaysStayed: days}
 	}
-	rents := SummaryOfContributions(utilsCost, daysStayed)
-	for i, rent := range rents {
-		tenant[i].Rent = monthlyRent + rent
+
+	summary := &Summary{
+		MonthlyTotal:     monthlyTotal,
+		MonthlyUtilities: utilsCost,
+		Tenants:          tenants,
 	}
-	summary, err := json.MarshalIndent(tenant, "", "  ")
+	Calculate(summary)
+	report, err := json.MarshalIndent(summary, "", "  ")
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("\n%s\n", string(summary))
+	fmt.Printf("\n%s\n", string(report))
 }
